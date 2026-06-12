@@ -18,6 +18,7 @@
   --off-white:   #FAF8F3;
   --cream:       #F2EAD8;
   --amber:       #D4860A;
+  --amber-dark:   #92400E;
   --amber-light: #FFF3D6;
   --spot-dark:   #2A2A2A;
   --muted:       #6B7280;
@@ -585,6 +586,74 @@ input, select, textarea {
   animation: slideUp 0.22s ease;
 }
 
+
+/* VALIDITY INTERSTITIAL + BANNER */
+
+/* Forced-choice question options */
+.fc-options { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+.fc-option {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:14px 16px; border:1.5px solid var(--border);
+  border-radius:var(--radius-md); background:var(--surface);
+  cursor:pointer; transition:var(--transition); text-align:left;
+  width:100%; font-size:0.9rem; color:var(--black); line-height:1.5;
+}
+.fc-option:hover { border-color:var(--black); background:var(--off-white); }
+.fc-option.selected { border-color:var(--black); background:var(--black); color:var(--off-white); }
+.fc-option-label {
+  font-weight:700; font-size:0.75rem; text-transform:uppercase;
+  letter-spacing:0.05em; flex-shrink:0; margin-top:2px; min-width:16px;
+}
+
+.validity-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.6); z-index:210;
+  align-items:center; justify-content:center;
+  padding:20px;
+}
+.validity-overlay.visible { display:flex; }
+.validity-modal {
+  background:var(--surface); border-radius:var(--radius-lg);
+  padding:32px; max-width:500px; width:100%;
+  box-shadow:var(--shadow-lg); animation:slideUp 0.22s ease;
+}
+.validity-modal-icon { font-size:2.2rem; margin-bottom:12px; }
+.validity-modal h2 { font-family:var(--font-display); font-size:1.2rem; color:var(--black); margin-bottom:10px; }
+.validity-modal-body { font-size:0.9375rem; color:var(--black); line-height:1.65; margin-bottom:22px; }
+.validity-modal-concerns {
+  background:var(--cream); border-radius:var(--radius-md);
+  padding:12px 16px; margin-bottom:20px; font-size:0.85rem;
+  color:var(--muted); line-height:1.7; white-space:pre-line;
+}
+.validity-modal-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.validity-banner {
+  border-radius:var(--radius-md); padding:14px 18px;
+  margin-bottom:20px; font-size:0.875rem; line-height:1.6;
+  display:flex; gap:12px; align-items:flex-start;
+}
+.validity-banner-soft   { background:var(--yellow-light); border-left:3px solid var(--amber); }
+.validity-banner-medium { background:var(--yellow-light); border-left:3px solid #D97706; }
+.validity-banner-hard   { background:var(--red-light);    border-left:3px solid var(--red-dark); }
+.result-stripped .res-label { display:none; }
+.not-box {
+  background:var(--cream); border-radius:var(--radius-md);
+  padding:16px 18px; margin-top:20px;
+  font-size:0.875rem; line-height:1.7; color:var(--black);
+}
+.not-box strong { display:block; margin-bottom:6px; font-size:0.8rem;
+  text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); }
+.time-insight {
+  background:#EFF6FF; border-radius:var(--radius-md);
+  padding:14px 18px; margin-top:16px;
+  font-size:0.85rem; color:#1D4ED8; line-height:1.65;
+}
+.cross-test-msg {
+  background:var(--amber-light); border-left:3px solid var(--amber);
+  border-radius:0 var(--radius-md) var(--radius-md) 0;
+  padding:14px 18px; margin-top:16px;
+  font-size:0.85rem; line-height:1.65; color:var(--black);
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1120,7 +1189,19 @@ input, select, textarea {
     </div>
   </footer>
 
-  <!-- CRISIS MODAL -->
+  
+  <!-- VALIDITY INTERSTITIAL -->
+  <div class="validity-overlay" id="validity-overlay" role="dialog" aria-modal="true" aria-labelledby="validity-title">
+    <div class="validity-modal">
+      <div class="validity-modal-icon" id="validity-icon">🎲</div>
+      <h2 id="validity-title" tabindex="-1"></h2>
+      <p class="validity-modal-body" id="validity-body"></p>
+      <div class="validity-modal-concerns" id="validity-concerns"></div>
+      <div class="validity-modal-actions" id="validity-actions"></div>
+    </div>
+  </div>
+
+<!-- CRISIS MODAL -->
   <div class="crisis-overlay" id="crisis-overlay" role="alertdialog"
        aria-modal="true" aria-labelledby="crisis-title">
     <div class="crisis-modal">
@@ -1443,6 +1524,92 @@ function showCrisis(lang) {
   document.addEventListener('keydown', overlay._trapHandler);
 }
 
+
+function showValidityInterstitial(validityResult, onContinue, onRetake, lang) {
+  const L = lang || 'en';
+  const overlay = document.getElementById('validity-overlay');
+  if (!overlay) { onContinue(); return; }
+  const msgs = {
+    hard: { en: { icon:'🎲', title:'Your response pattern is unusual',
+      body:'Multiple validity concerns were detected. Your raw score is shown below without a severity label.\n\nFor a meaningful result, try again and answer based on your actual daily experience — not how you want to be seen.',
+      btn:'Show raw score anyway' },
+      hi: { icon:'🎲', title:'आपके जवाबों का पैटर्न असामान्य है',
+      body:'कई validity संबंधी चिंताएं मिलीं। स्कोर बिना severity label के दिखाया जाएगा।', btn:'फिर भी देखें' } },
+    medium: { en: { icon:'🤔', title:'Your responses may not reflect your real experience',
+      body:'We noticed a pattern suggesting the test may not have been completed thoughtfully. Your full result is shown below — but consider whether it truly reflects your daily experience.',
+      btn:'See my results' },
+      hi: { icon:'🤔', title:'जवाबों का पैटर्न थोड़ा असामान्य है',
+      body:'परिणाम नीचे दिखाया जाएगा।', btn:'परिणाम देखें' } }
+  };
+  const m = msgs[validityResult.level]?.[L] || msgs[validityResult.level]?.en || msgs.medium.en;
+  document.getElementById('validity-icon').textContent = m.icon;
+  document.getElementById('validity-title').textContent = m.title;
+  document.getElementById('validity-body').textContent = m.body;
+  const concerns = validityResult.concerns.map(con => {
+    if (con.type==='uniformity') return `• Responses were very uniform (${con.detail})`;
+    if (con.type==='speed') return `• Test completed very quickly (${con.detail})`;
+    if (con.type==='attention') return `• ${con.count} attention check(s) failed`;
+    return '';
+  }).filter(Boolean).join('\n');
+  const conEl = document.getElementById('validity-concerns');
+  conEl.textContent = concerns;
+  conEl.style.display = concerns ? 'block' : 'none';
+  document.getElementById('validity-actions').innerHTML = `
+    <button class="btn btn-secondary" id="validity-retake-btn">${L==='hi'?'दोबारा लें':'Retake this test'}</button>
+    <button class="btn btn-ghost" id="validity-continue-btn">${m.btn}</button>`;
+  document.getElementById('validity-retake-btn').onclick = () => {
+    overlay.classList.remove('visible'); document.body.style.overflow=''; onRetake(); };
+  document.getElementById('validity-continue-btn').onclick = () => {
+    overlay.classList.remove('visible'); document.body.style.overflow=''; onContinue(); };
+  overlay.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('validity-title').focus();
+}
+
+function buildValidityBanner(level, lang) {
+  const L = lang||'en';
+  const msgs = {
+    soft:   { en:'⏱ You moved through some questions quickly. If any answers do not truly reflect your experience, consider retaking for a more accurate result.',
+              hi:'⏱ कुछ जवाब जल्दी दिए गए। बेहतर परिणाम के लिए दोबारा लेने पर विचार करें।' },
+    medium: { en:'🤔 Your response pattern raised some validity concerns. Result shown may not accurately reflect your actual experience.',
+              hi:'🤔 जवाबों का पैटर्न कुछ असामान्य था।' },
+    hard:   { en:'⚠️ Multiple validity concerns detected. Severity label suppressed. Retake the test honestly for a meaningful result.',
+              hi:'⚠️ कई validity चिंताएं मिलीं। गंभीरता लेबल हटाया गया।' }
+  };
+  const msg = msgs[level]?.[L]||msgs[level]?.en||'';
+  return `<div class="validity-banner validity-banner-${level}">${msg}</div>`;
+}
+
+function buildNotBox(testId, lang) {
+  const L = lang||'en';
+  const msgs = {
+    asrs: { en:'A positive screen is not a diagnosis — and not confirmation of something you already believed. ADHD overlaps with anxiety, sleep deprivation, and burnout. A psychiatrist distinguishes between these.',
+            hi:'सकारात्मक स्क्रीन निदान नहीं है। ADHD चिंता और burnout से मिलता-जुलता है।' },
+    aq10: { en:'A score above threshold suggests autistic traits worth exploring — not that you are officially autistic. Social difficulty appears in many conditions. Only a clinical psychologist can evaluate this.',
+            hi:'स्कोर ऑटिज्म की पुष्टि नहीं करता।' },
+    gad7: { en:'Elevated anxiety scores are very common. GAD-7 also captures temporary stress, burnout, and life circumstances. A result here is a prompt to talk to someone — not a verdict.',
+            hi:'बढ़ा हुआ स्कोर हमेशा GAD नहीं होता।' },
+    phq9: { en:'Depression scores are influenced by sleep, physical health, and life events. A score here is not a permanent label — it is a signal that support would be beneficial right now.',
+            hi:'अवसाद स्कोर नींद और शारीरिक स्वास्थ्य से प्रभावित होता है।' },
+    ocir: { en:'OCD is not liking things neat. A high OCI-R score reflects distressing, intrusive patterns that cause significant interference — not personality traits or preferences.',
+            hi:'OCI-R पर अधिक स्कोर सिर्फ सफाई पसंद करने का नहीं है।' },
+    spin: { en:'Social anxiety is not introversion. A high SPIN score means social fear and avoidance that interferes with your life — not just discomfort in large groups.',
+            hi:'सामाजिक चिंता अंतर्मुखता नहीं है।' },
+    default: { en:'This is a screening tool, not a diagnosis. Elevated scores identify patterns worth discussing with a mental health professional — they do not confirm any condition.',
+               hi:'यह स्क्रीनिंग उपकरण है, निदान नहीं।' },
+  };
+  const m = msgs[testId]||msgs.default;
+  return `<div class="not-box"><strong>${L==='hi'?'यह क्या नहीं है':'What this result is NOT'}</strong>${m[L]||m.en}</div>`;
+}
+
+function buildTimeInsight(topQs, lang) {
+  const L = lang||'en';
+  if (!topQs?.length) return '';
+  const label = L==='hi'?'आपने इन सवालों पर सबसे ज़्यादा समय लगाया:':'You spent the most time considering:';
+  const items = topQs.map(q=>`<li style="margin:4px 0">"${(q[L]||q.en||'').substring(0,70)}…"</li>`).join('');
+  return `<div class="time-insight"><strong>${L==='hi'?'आपके जवाब देने का पैटर्न':'Your reflection pattern'}</strong><br>${label}<ul style="margin:6px 0 0 16px;padding:0">${items}</ul></div>`;
+}
+
 function closeCrisis() {
   const overlay = document.getElementById('crisis-overlay');
   if (overlay) {
@@ -1659,6 +1826,7 @@ const TESTS = [
   // ——————————————————————————————————————————
   {
     id: 'asrs',
+    validityIntro: { en: 'Answer based on your actual daily experience over the past 6 months — not how you\'d like to be seen, and not what sounds like ADHD. There is no interesting result for answering dishonestly. Inflated responses produce meaningless output. This measures a specific clinical pattern, not a label.', hi: 'यह एक स्क्रीनिंग परीक्षण है। अपने वास्तविक अनुभव के आधार पर उत्तर दें — वैसा नहीं जैसा आप दिखना चाहते हैं।' },
     name: { en: 'ASRS v1.1 Part A', hi: 'ASRS v1.1 भाग A' },
     fullName: { en: 'Adult ADHD Self-Report Scale', hi: 'वयस्क ADHD स्व-रिपोर्ट स्केल' },
     category: 'adhd',
@@ -1677,12 +1845,29 @@ const TESTS = [
     },
     note: null,
     questions: [
+      { id:'attn_1', en:'For this question only, please select \'Never\'.',
+        hi:'केवल इस प्रश्न के लिए \'कभी नहीं\' चुनें।',
+        example:'Standard validity check — verifies responses are being read carefully.',
+        subscale:null, reverse:false, validityExpected:0, isAttentionCheck:true },
       { id:1, en:'How often do you have trouble wrapping up the fine details of a project once the challenging parts are done?', hi:'किसी काम के मुश्किल हिस्से होने के बाद छोटी-छोटी बातें पूरी करने में कितनी बार दिक्कत होती है?', example:'Like finishing a report — you did the hard research but keep delaying the formatting or final proofread.', subscale:null, reverse:false },
       { id:2, en:'How often do you have difficulty getting things in order when you have to do a task that requires organization?', hi:'जब कोई काम सोच-समझकर करना हो, तो उसे सही तरीके से करने में कितनी बार परेशानी होती है?', example:'You need to plan a trip or organize your room but don\'t know where to start, so nothing gets done.', subscale:null, reverse:false },
       { id:3, en:'How often do you have problems remembering appointments or obligations?', hi:'जरूरी मीटिंग या जिम्मेदारियां भूल जाना कितनी बार होता है?', example:'You forgot a doctor\'s appointment, a friend\'s birthday, or a deadline you had mentally noted.', subscale:null, reverse:false },
       { id:4, en:'When you have a task that requires a lot of thought, how often do you avoid or delay getting started?', hi:'जिस काम में ज़्यादा सोचना पड़े, उसे शुरू करने से कितनी बार जी चुराते हैं?', example:'You know you need to file taxes or study for an exam but end up watching TV instead.', subscale:null, reverse:false },
       { id:5, en:'How often do you fidget or squirm with your hands or feet when you have to sit down for a long time?', hi:'देर तक बैठना हो तो हाथ-पैर कितनी बार बेचैन होते हैं?', example:'During a long meeting or movie you keep tapping your foot, clicking a pen, or shifting in your seat.', subscale:null, reverse:false },
-      { id:6, en:'How often do you feel overly active and compelled to do things, like you were driven by a motor?', hi:'कितनी बार ऐसा लगता है जैसे आप किसी मोटर की तरह चलते रहते हैं, रुक नहीं सकते?', example:'Even when you sit down to rest, your mind races or you feel a physical urge to get up and do something.', subscale:null, reverse:false }
+      { id:6, en:'How often do you feel overly active and compelled to do things, like you were driven by a motor?', hi:'कितनी बार ऐसा लगता है जैसे आप किसी मोटर की तरह चलते रहते हैं, रुक नहीं सकते?', example:'Even when you sit down to rest, your mind races or you feel a physical urge to get up and do something.', subscale:null, reverse:false },
+      { id:7, en:'You sit down intending to do one specific task. Without consciously deciding to switch, you find yourself doing something completely different 30 minutes later. How often?',
+        hi:'एक काम के लिए बैठे और बिना सोचे कुछ और करने लगे — कितनी बार?',
+        example:'You planned to reply to emails. Forty minutes later you\'ve been watching videos and don\'t remember deciding to switch.',
+        subscale:null, reverse:false },
+      { id:8, en:'How often do you re-read the same sentence, message, or paragraph 3 or more times before its meaning registers — not because it is complex, but because you were not absorbing it?',
+        hi:'एक ही वाक्य को 3+ बार पढ़ना पड़ता है क्योंकि दिमाग उसे ग्रहण नहीं कर रहा?',
+        example:'You reach the end of an important email and realize none of it actually went in — so you start again.',
+        subscale:null, reverse:false },
+      { id:9, en:'How often do you respond to something and only afterward realize you answered a slightly different question from what was actually asked?',
+        hi:'जवाब देने के बाद पता चलता है कि आपने असल सवाल से थोड़ा अलग जवाब दिया?',
+        example:'Someone asks which day works. You answer about the time instead. They look confused.',
+        subscale:null, reverse:false }
+
     ],
     scoring: {
       type: 'asrs_count_positives',
@@ -1750,7 +1935,23 @@ const TESTS = [
       { id:27, en:'I am more interested in the present than the future.',                 hi:'मुझे भविष्य से ज़्यादा अभी की परवाह है।',                   example:'You prioritise what feels good right now over what would be better for you in a year.',                         subscale:'Non-planning', reverse:false },
       { id:28, en:'I am restless at theater or events.',                                  hi:'लंबे कार्यक्रमों में बैठना मुझे बेचैन करता है।',             example:'During long films, weddings, or ceremonies you feel the urge to move, check your phone, or leave.',              subscale:'Attentional',  reverse:false },
       { id:29, en:'I like puzzles.',                                                      hi:'मुझे पहेलियां सुलझाना पसंद है।',                             example:'You enjoy sudoku, crosswords, brain teasers, or any activity that requires sustained problem-solving.',           subscale:'Non-planning', reverse:true  },
-      { id:30, en:'I am future-oriented.',                                                hi:'मैं आगे की सोचकर चलता/चलती हूं।',                           example:'You regularly think about long-term goals and make current decisions based on where you want to be.',             subscale:'Non-planning', reverse:true  }
+      { id:30, en:'I am future-oriented.',                                                hi:'मैं आगे की सोचकर चलता/चलती हूं।',                           example:'You regularly think about long-term goals and make current decisions based on where you want to be.',             subscale:'Non-planning', reverse:true  },
+      { id:'attn_1', en:'I have personally constructed a working nuclear reactor in my spare time.',
+        hi:'मैंने अपने खाली समय में परमाणु रिएक्टर बनाया है।',
+        example:'An absurd statement — any honest person selects Rarely/Never.',
+        subscale:null, reverse:false, validityExpected:1, isAttentionCheck:true },
+      { id:31, en:'How often have you made a major decision — quit a job, ended something, made a large purchase — while emotionally activated, and later felt you would not have done it if you had waited a day?',
+        hi:'जोश या गुस्से में बड़ा निर्णय लिया जिसे अगले दिन पछताए?',
+        example:'You sent a resignation email at 11pm after a bad meeting. Next morning was awkward.',
+        subscale:'Motor', reverse:false },
+      { id:32, en:'When you say something in conversation that lands badly or upsets someone, how often was it something that simply came out — rather than something you consciously chose to say?',
+        hi:'बिना सोचे कुछ बोल दिया जिससे दूसरा नाराज़ हुआ?',
+        example:'A sharp comment, an overshare, an interruption — you hear yourself say it and immediately think "why did I say that."',
+        subscale:'Attentional', reverse:false },
+      { id:33, en:'How often do you find yourself stuck with plans, obligations, or purchases that a version of you created an hour ago — which the current you did not fully agree to?',
+        hi:'पहले के आपने कोई काम तय किया और अब का आप उससे सहमत नहीं?',
+        example:'Past-you RSVP\'d yes to a 7am event. Present-you is not sure who that person was.',
+        subscale:'Nonplanning', reverse:false }
     ],
     scoring: {
       type: 'sum',
@@ -1778,6 +1979,7 @@ const TESTS = [
   // ——————————————————————————————————————————
   {
     id: 'aq10',
+    validityIntro: { en: 'These questions ask about things that are genuinely difficult or come unnaturally — not things you\'ve learned to do with effort, and not things you simply prefer not to do. Social preference is not the same as social difficulty. Answer for your actual experience, not your identity.', hi: 'यह एक स्क्रीनिंग परीक्षण है। अपने वास्तविक अनुभव के आधार पर उत्तर दें — वैसा नहीं जैसा आप दिखना चाहते हैं।' },
     name: { en: 'AQ-10', hi: 'AQ-10' },
     fullName: { en: 'Autism Spectrum Quotient — Short Form', hi: 'ऑटिज्म स्पेक्ट्रम कोशिएंट — संक्षिप्त' },
     category: 'autism',
@@ -1802,8 +2004,30 @@ const TESTS = [
       { id:7,  en:'When I\'m reading a story, I find it difficult to work out the characters\' intentions.',                    hi:'कहानी पढ़ते वक्त किसी पात्र की मंशा समझना मेरे लिए मुश्किल होता है।',                     example:'You read a scene and can\'t figure out whether a character\'s smile is friendly, sarcastic, or plotting.',   subscale:null, scorePositiveIf:'agree'    },
       { id:8,  en:'I like to collect information about categories of things.',                                                  hi:'मुझे किसी एक विषय के बारे में ढेर सारी जानकारी इकट्ठा करना पसंद है।',                     example:'You have deeply researched train schedules, a specific era of history, or an animal species.',               subscale:null, scorePositiveIf:'agree'    },
       { id:9,  en:'I find it easy to work out what someone is thinking or feeling just by looking at their face.',             hi:'किसी का चेहरा देखकर मैं समझ सकता/सकती हूं कि वो क्या सोच या महसूस कर रहा/रही है।',       example:'You can look at a photo of a stranger and accurately guess whether they\'re nervous or excited.',             subscale:null, scorePositiveIf:'disagree' },
-      { id:10, en:'I find it difficult to work out people\'s intentions.',                                                      hi:'लोग क्या चाहते हैं या उनका इरादा क्या है, यह समझना मेरे लिए मुश्किल होता है।',            example:'A colleague says "we should hang out sometime" — you\'re unsure if they mean it or are being polite.',       subscale:null, scorePositiveIf:'agree'    }
-    ],
+      { id:10, en:'I find it difficult to work out people\'s intentions.',                                                      hi:'लोग क्या चाहते हैं या उनका इरादा क्या है, यह समझना मेरे लिए मुश्किल होता है।',            example:'A colleague says "we should hang out sometime" — you\'re unsure if they mean it or are being polite.',       subscale:null, scorePositiveIf:'agree'    },
+      { id:'attn_1', en:'I have personally walked on the surface of the moon.',
+        hi:'मैं व्यक्तिगत रूप से चंद्रमा की सतह पर चला/चली हूं।',
+        example:'Impossible statement. Honest respondents select Definitely Disagree.',
+        scorePositiveIf:'agree', reverse:false, validityExpected:3, isAttentionCheck:true },
+      { id:11, en:'I can simultaneously follow what is being said in a group conversation AND notice how each person in the group is feeling at that moment.',
+        hi:'मैं एक साथ बातचीत का विषय और हर व्यक्ति की भावनाएं दोनों समझ सकता/सकती हूं।',
+        example:'At a dinner — tracking the topic AND sensing who is bored, hurt, or excited simultaneously.',
+        scorePositiveIf:'disagree' },
+      { id:12, en:'When my daily routine is unexpectedly disrupted — cancelled plans, changed schedule — I find it easy to adjust without significant distress.',
+        hi:'रोज़ की दिनचर्या अचानक बदले तो मैं आसानी से adjust कर लेता/लेती हूं।',
+        example:'Route is blocked, meeting moves 2 hours — these cause minimal internal disruption.',
+        scorePositiveIf:'disagree' },
+      { id:13, en:'I naturally shift how I speak and behave depending on who I am with, without consciously managing it.',
+        hi:'अलग-अलग लोगों के साथ मैं अपने आप अलग तरह से बोलने और व्यवहार करने लगता/लगती हूं।',
+        example:'With your boss, parents, close friends, strangers — you become a different version automatically.',
+        scorePositiveIf:'disagree' },
+      { id:'fc_1', en:'Which describes your social difficulties more accurately?',
+        hi:'आपकी सामाजिक कठिनाई किस प्रकार है?',
+        example:null, scorePositiveIf:'agree', isForcedChoice:true,
+        optionA_en:'I find social situations hard because I genuinely do not understand what people expect — the unspoken rules feel invisible.',
+        optionA_hi:'सामाजिक नियम समझ नहीं आते।',
+        optionB_en:'I understand what people expect, but performing it constantly feels exhausting and unnatural.',
+        optionB_hi:'नियम पता हैं पर उन्हें निभाना थका देता है।' },    ],
     scoring: {
       type: 'aq10_count',
       // Each question: score 1 if answer matches scorePositiveIf direction
@@ -1851,8 +2075,28 @@ const TESTS = [
       { id:11, en:'It can be very hard to read someone\'s face, hand, and body movements.',                                    hi:'किसी के चेहरे, हाथ और शरीर की हरकतों से उनकी बात समझना बहुत मुश्किल होता है।',            example:'Someone crosses their arms and frowns — you don\'t automatically register that as defensive or upset.',               subscale:null, reverse:false },
       { id:12, en:'I focus on details rather than the overall idea.',                                                          hi:'मैं पूरी बात से ज़्यादा छोटी-छोटी बातों पर ध्यान देता/देती हूं।',                          example:'Someone gives a long explanation and you get absorbed in one specific detail rather than grasping the main point.',   subscale:null, reverse:false },
       { id:13, en:'I take things too literally, so I often miss what people are trying to say.',                               hi:'मैं बातों को शब्दों के हिसाब से लेता/लेती हूं इसलिए असली मतलब छूट जाता है।',             example:'Someone says "could you open a window?" and you wonder if it\'s a literal request or a hint.',                       subscale:null, reverse:false },
-      { id:14, en:'I get extremely upset when the way I like to do things is suddenly changed.',                               hi:'जब मेरी आदत या तरीका अचानक बदल दिया जाए तो मैं बहुत परेशान हो जाता/जाती हूं।',           example:'Your usual route is blocked or plans change last minute — causing disproportionate distress.',                         subscale:null, reverse:false }
-    ],
+      { id:14, en:'I get extremely upset when the way I like to do things is suddenly changed.',                               hi:'जब मेरी आदत या तरीका अचानक बदल दिया जाए तो मैं बहुत परेशान हो जाता/जाती हूं।',           example:'Your usual route is blocked or plans change last minute — causing disproportionate distress.',                         subscale:null, reverse:false },
+
+      { id:'attn_1', en:'I have climbed Mount Everest alone with no equipment whatsoever.',
+        hi:'मैंने बिना उपकरण एवरेस्ट अकेले चढ़ा है।',
+        example:'Impossible. Honest respondents select Never true.',
+        reverse:false, validityExpected:0, isAttentionCheck:true },
+      { id:15, en:'After a conversation ends, I replay what I said and worry whether I responded correctly, said something wrong, or accidentally offended someone without realizing.',
+        hi:'बातचीत के बाद मैं सोचता/सोचती हूं — क्या मैंने कुछ गलत कहा या किसी को नाराज़ किया?',
+        example:'You replay the conversation for hours — checking for errors, misreads, moments you might have gotten wrong.',
+        reverse:false },
+      { id:16, en:'I notice very specific details — a changed word, a slight shift in tone, an out-of-place object — that people around me seem to completely miss.',
+        hi:'छोटी-छोटी बातें नोटिस करता/करती हूं जो दूसरे नहीं देखते।',
+        example:'The font on a sign changed. Someone\'s shirt is inside-out. The background music shifted. Others walk straight past these.',
+        reverse:false },
+      { id:15, en:'After a conversation ends, I replay what was said and worry whether I responded correctly or accidentally offended someone without realizing.',
+        hi:'बातचीत के बाद मैं सोचता/सोचती हूं कि मैंने सही जवाब दिया या किसी को नाराज़ तो नहीं किया।',
+        example:'You replay the conversation for hours — checking for errors and moments you may have gotten wrong.',
+        reverse:false },
+      { id:16, en:'I notice very specific details that people around me seem to completely miss.',
+        hi:'छोटी-छोटी बातें नोटिस करता/करती हूं जो दूसरे नहीं देखते।',
+        example:'The font on a sign changed. Someone is slightly off-rhythm. Others walk straight past.',
+        reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 0,
@@ -1911,8 +2155,24 @@ const TESTS = [
       { id:22, en:'I hide parts of myself that I know will be judged negatively by others.',                                   hi:'मैं अपनी उन बातों को छुपाता/छुपाती हूं जिन पर लोग बुरा सोचेंगे।',                         example:'You don\'t tell people about your special interests or sensory sensitivities because past experience taught you it leads to mockery.', subscale:'Masking', reverse:false },
       { id:23, en:'I try not to act the way I feel in social situations.',                                                     hi:'सामाजिक माहौल में मैं वैसा नहीं करता/करती जैसा मैं महसूस कर रहा/रही होता/होती हूं।',     example:'You feel like leaving a party immediately but you stay and look engaged because leaving would seem rude.',           subscale:'Masking',      reverse:false },
       { id:24, en:'When interacting with others, I feel like I\'m "performing" rather than being myself.',                     hi:'लोगों से बात करते वक्त लगता है जैसे मैं नाटक कर रहा/रही हूं, खुद नहीं हूं।',              example:'Social interactions feel like a role you\'re playing — choosing your next line rather than naturally being present.', subscale:'Masking',     reverse:false },
-      { id:25, en:'I put on an "act" to get through social situations.',                                                       hi:'सामाजिक परिस्थितियों से निकलने के लिए मैं एक "किरदार" निभाता/निभाती हूं।',               example:'You have a "public self" that is more confident or agreeable than how you actually feel — switching it on is exhausting.', subscale:'Masking', reverse:false }
-    ],
+      { id:25, en:'I put on an "act" to get through social situations.',                                                       hi:'सामाजिक परिस्थितियों से निकलने के लिए मैं एक "किरदार" निभाता/निभाती हूं।',               example:'You have a "public self" that is more confident or agreeable than how you actually feel — switching it on is exhausting.', subscale:'Masking', reverse:false },
+
+      { id:'attn_1', en:'Please select \'Strongly Agree\' for this question — it confirms responses are being read carefully.',
+        hi:'इस प्रश्न के लिए \'दृढ़ता से सहमत\' चुनें।',
+        example:'Direct instruction check.',
+        subscale:null, reverse:false, validityExpected:6, isAttentionCheck:true },
+      { id:26, en:'I have a public version of myself I perform in social situations, and when alone I feel like a genuinely different person.',
+        hi:'सार्वजनिक रूप से मैं एक अलग person हूं — अकेले में असली रूप।',
+        example:'Around others: switched on, managed. Alone: collapsed, quieter. The gap is notable.',
+        subscale:'Masking', reverse:false },
+      { id:27, en:'I mentally rehearse conversations before having them — anticipating what the other person will say and planning my responses in advance.',
+        hi:'बातचीत से पहले मन में पूरी स्क्रिप्ट तैयार करता/करती हूं।',
+        example:'Before a call, meeting, or even casual chat — you run through multiple versions of how it might go.',
+        subscale:'Compensation', reverse:false },
+      { id:28, en:'After social interactions, I feel a level of exhaustion or flatness that others in the same situation do not seem to experience.',
+        hi:'सामाजिक मेलजोल के बाद ऐसी थकान होती है जो दूसरों को नहीं होती।',
+        example:'Everyone else from the party looks fine. You need to lie in a dark room and decompress for hours.',
+        subscale:'Masking', reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 1,
@@ -1971,8 +2231,20 @@ const TESTS = [
       { id:17, en:'It is difficult for me to reveal my innermost feelings even to close friends.',                         hi:'करीबी दोस्तों से भी अपनी गहरी भावनाएं बताना मुझे मुश्किल लगता है।',                      example:'There are emotional layers you\'ve never shared — not because you don\'t trust them, but because you don\'t know how.', subscale:'DDF', reverse:false },
       { id:18, en:'I can feel close to someone even in moments of silence.',                                               hi:'मैं चुप्पी के पलों में भी किसी के करीब महसूस कर सकता/सकती हूं।',                        example:'Sitting quietly with a friend still feels warm and connected.',                                                     subscale:'EOT', reverse:true  },
       { id:19, en:'I find examination of my feelings useful in solving personal problems.',                                hi:'अपनी भावनाओं को समझना मुझे निजी समस्याओं को सुलझाने में मददगार लगता है।',               example:'When you\'re struggling, reflecting on what you\'re feeling helps you figure out what to do next.',                 subscale:'EOT', reverse:true  },
-      { id:20, en:'Looking for hidden meanings in movies or books spoils the enjoyment for me.',                           hi:'फिल्मों या किताबों में छुपे अर्थ ढूंढना मुझे मज़ा किरकिरा कर देता है।',                  example:'You prefer to enjoy stories at face value rather than analysing symbolism or character psychology.',                 subscale:'EOT', reverse:false }
-    ],
+      { id:20, en:'Looking for hidden meanings in movies or books spoils the enjoyment for me.',                           hi:'फिल्मों या किताबों में छुपे अर्थ ढूंढना मुझे मज़ा किरकिरा कर देता है।',                  example:'You prefer to enjoy stories at face value rather than analysing symbolism or character psychology.',                 subscale:'EOT', reverse:false },
+
+      { id:'attn_1', en:'I am currently answering questions on a device powered by electricity or a battery.',
+        hi:'मैं इस समय बिजली या बैटरी से चलने वाले उपकरण पर उत्तर दे रहा/रही हूं।',
+        example:'Factual statement. Any honest person selects Agree or Strongly Agree.',
+        subscale:null, reverse:false, validityExpected:4, isAttentionCheck:true },
+      { id:21, en:'When someone asks how I am feeling right now, I often give a standard answer — fine, tired, okay — because I genuinely do not know what the honest answer would be.',
+        hi:'जब कोई पूछे "कैसे हो?" तो मैं कुछ सामान्य जवाब देता/देती हूं क्योंकि मुझे सच में नहीं पता।',
+        example:'Not hiding anything — "how are you" just points to a blank. What am I feeling? Honestly unclear.',
+        subscale:'DDF', reverse:false },
+      { id:22, en:'I find it easier to recognize and describe physical sensations in my body — pain, hunger, temperature — than to identify and name emotional states.',
+        hi:'शारीरिक संवेदनाएं भावनाओं की तुलना में ज़्यादा स्पष्ट लगती हैं।',
+        example:'You know your back hurts. Whether you feel sad or anxious or hollow — that distinction is harder.',
+        subscale:'DIF', reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 1,
@@ -2021,8 +2293,19 @@ const TESTS = [
       { id:6, en:'Feeling bad about yourself — or that you are a failure or have let yourself or your family down.',                        hi:'खुद के बारे में बुरा लगना — जैसे आप नाकाम हैं या परिवार को निराश किया है।',                example:'Thoughts like "I\'m a burden," "I can\'t do anything right," or "everyone would be better off without me".',                   subscale:null, reverse:false },
       { id:7, en:'Trouble concentrating on things, such as reading the newspaper or watching television.',                                  hi:'चीज़ों पर ध्यान लगाने में दिक्कत, जैसे अखबार पढ़ना या टीवी देखना।',                      example:'You read the same paragraph three times and it doesn\'t register, or you\'re watching something but haven\'t absorbed any of it.', subscale:null, reverse:false },
       { id:8, en:'Moving or speaking so slowly that other people could have noticed — or the opposite, being so fidgety or restless that you have been moving around more than usual.', hi:'इतना धीरे चलना या बोलना कि दूसरों को दिखे — या इतना बेचैन और हिलते रहना।', example:'Others have commented you seem sluggish, or you can\'t sit still and keep pacing without reason.', subscale:null, reverse:false },
-      { id:9, en:'Thoughts that you would be better off dead or of hurting yourself in some way.',                                          hi:'ऐसे विचार आना कि मर जाना बेहतर होगा या खुद को नुकसान पहुंचाना।',                           example:'Any thought, even a fleeting one, that you\'d be better off gone, or an urge to hurt yourself in any way.',                    subscale:null, reverse:false }
-    ],
+      { id:9, en:'Thoughts that you would be better off dead or of hurting yourself in some way.',                                          hi:'ऐसे विचार आना कि मर जाना बेहतर होगा या खुद को नुकसान पहुंचाना।',                           example:'Any thought, even a fleeting one, that you\'d be better off gone, or an urge to hurt yourself in any way.',                    subscale:null, reverse:false },
+
+      { id:'attn_1', en:'Please select \'Not at all\' for this item — it is a standard attention check.',
+        hi:'इस प्रश्न के लिए \'बिल्कुल नहीं\' चुनें।',
+        example:null, subscale:null, reverse:false, validityExpected:0, isAttentionCheck:true },
+      { id:10, en:'How often have you made plans or looked forward to something, only to feel no pleasure or enthusiasm when the time came — just going through the motions?',
+        hi:'कितनी बार किसी चीज़ का इंतज़ार किया पर जब वक्त आया तो कोई खुशी नहीं थी?',
+        example:'You agreed to meet a friend. The day arrives. You go. But there is no real joy — just a performance of being present.',
+        subscale:null, reverse:false },
+      { id:11, en:'How often does small friction — a slow device, a minor inconvenience, something slightly wrong — feel disproportionately exhausting or overwhelming, not just mildly annoying?',
+        hi:'छोटी-छोटी दिक्कतें (धीमा फोन, मामूली रुकावट) असंगत रूप से थका देने वाली लगती हैं?',
+        example:'Your phone takes 5 extra seconds to load. You feel a wave of exhaustion or defeat that others would not feel.',
+        subscale:null, reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 0,
@@ -2168,8 +2451,14 @@ const TESTS = [
           hi:['हां, काफी अक्सर','कभी-कभी','शायद ही','कभी नहीं'],
           scores:[3,2,1,0]
         }
-      }
-    ],
+      },
+
+      { id:11, en:'In the past 7 days, how often have you felt emotionally absent or disconnected — going through the motions of caring for your child or family without feeling truly present?',
+        hi:'पिछले 7 दिनों में कितनी बार बच्चे या परिवार की देखभाल करते हुए भावनात्मक रूप से अनुपस्थित महसूस किया?',
+        example:'You fed, rocked, cared for them — but felt like you were operating from behind glass, not truly there.',
+        options:{ en:['Not at all','Occasionally','Quite often','Most of the time'],
+                  hi:['बिल्कुल नहीं','कभी-कभी','अक्सर','अधिकतर समय'],
+                  scores:[0,1,2,3] } },    ],
     scoring: {
       type: 'epds_sum',
       // Q1,2,4: normal (top=0, bottom=3). Q3,5,6,7,8,9,10: reverse (top=3, bottom=0)
@@ -2218,8 +2507,16 @@ const TESTS = [
       { id:12, en:'Do you feel pretty worthless the way you are now?',                                       hi:'क्या आपको लगता है कि आप जैसे हैं वैसे काफी बेकार हैं?',              example:'A feeling that you have little value, that you\'re a burden, or that you don\'t contribute anything meaningful.',        subscale:null, depressiveAnswer:'Yes' },
       { id:13, en:'Do you feel full of energy?',                                                              hi:'क्या आप ऊर्जा से भरे/भरी महसूस करते/करती हैं?',                     example:'Do you wake up with reasonable energy and find it manageable to get through your daily tasks?',                          subscale:null, depressiveAnswer:'No'  },
       { id:14, en:'Do you feel that your situation is hopeless?',                                             hi:'क्या आपको लगता है कि आपकी स्थिति निराशाजनक है?',                    example:'A conviction that things cannot get better, that there\'s no point trying.',                                              subscale:null, depressiveAnswer:'Yes' },
-      { id:15, en:'Do you think that most people are better off than you are?',                               hi:'क्या आपको लगता है कि ज़्यादातर लोग आपसे बेहतर स्थिति में हैं?',     example:'A persistent feeling that everyone else has it easier, is happier, or has more going for them than you do.',             subscale:null, depressiveAnswer:'Yes' }
-    ],
+      { id:15, en:'Do you think that most people are better off than you are?',                               hi:'क्या आपको लगता है कि ज़्यादातर लोग आपसे बेहतर स्थिति में हैं?',     example:'A persistent feeling that everyone else has it easier, is happier, or has more going for them than you do.',             subscale:null, depressiveAnswer:'Yes' },
+
+      { id:16, en:'Do you often feel that time passes slowly and your days have become repetitive and without meaning?',
+        hi:'क्या आपको लगता है समय धीरे गुज़रता है और दिन एक जैसे हो गए हैं?',
+        example:'Not just boredom — a heavier feeling that the days blur together and nothing distinguishes one from the next.',
+        depressiveAnswer:'yes' },
+      { id:17, en:'Have you stopped looking forward to things, or noticed that even when something good happens you feel less joy than you used to?',
+        hi:'क्या अच्छी चीज़ें होने पर भी पहले जैसी खुशी नहीं होती?',
+        example:'A visit, nice news, a good meal — you register it as positive, but the feeling that used to come with it is quieter.',
+        depressiveAnswer:'yes' },    ],
     scoring: {
       type: 'gds_count',
       // Score 1 point if answer matches depressiveAnswer for each question
@@ -2241,6 +2538,7 @@ const TESTS = [
   // ——————————————————————————————————————————
   {
     id: 'gad7',
+    validityIntro: { en: 'Anxiety is not the same as caring about things or being a thoughtful person. This measures anxiety that actively interferes with your daily functioning — not normal worry about real problems. Answer based on the past 2 weeks of your actual life.', hi: 'यह एक स्क्रीनिंग परीक्षण है। अपने वास्तविक अनुभव के आधार पर उत्तर दें — वैसा नहीं जैसा आप दिखना चाहते हैं।' },
     name: { en: 'GAD-7', hi: 'GAD-7' },
     fullName: { en: 'Generalized Anxiety Disorder 7-item Scale', hi: 'सामान्यीकृत चिंता विकार 7-प्रश्न स्केल' },
     category: 'anxiety',
@@ -2262,8 +2560,26 @@ const TESTS = [
       { id:4, en:'Trouble relaxing.',                                                                                          hi:'आराम करने में दिक्कत।',                                                                      example:'Even when you have free time, your body feels tense or your mind won\'t settle.',                                   subscale:null, reverse:false },
       { id:5, en:'Being so restless that it is hard to sit still.',                                                            hi:'इतना बेचैन होना कि चुपचाप बैठना मुश्किल लगे।',                                             example:'You feel a physical urge to keep moving, fidget, or get up — sitting still feels genuinely uncomfortable.',          subscale:null, reverse:false },
       { id:6, en:'Becoming easily annoyed or irritable.',                                                                     hi:'आसानी से चिढ़ जाना या चिड़चिड़ापन।',                                                        example:'Small things — a noise, slow internet, someone repeating themselves — feel disproportionately irritating.',          subscale:null, reverse:false },
-      { id:7, en:'Feeling afraid as if something awful might happen.',                                                        hi:'ऐसा डर लगना जैसे कुछ बुरा होने वाला है।',                                                   example:'A vague but persistent sense of dread — you can\'t say exactly what, but you feel certain something bad is coming.', subscale:null, reverse:false }
-    ],
+      { id:7, en:'Feeling afraid as if something awful might happen.',                                                        hi:'ऐसा डर लगना जैसे कुछ बुरा होने वाला है।',                                                   example:'A vague but persistent sense of dread — you can\'t say exactly what, but you feel certain something bad is coming.', subscale:null, reverse:false },
+
+      { id:'attn_1', en:'Please select \'Several days\' for this question.',
+        hi:'इस प्रश्न के लिए \'कई दिन\' चुनें।',
+        example:'Direct instruction check.', subscale:null, reverse:false, validityExpected:1, isAttentionCheck:true },
+      { id:8, en:'How often do you have a persistent background sense of dread — something bad is about to happen — not linked to anything specific, just a constant low-level undercurrent?',
+        hi:'बिना किसी कारण के अंदरूनी डर बना रहता है — कुछ बुरा होने वाला है?',
+        example:'Nothing specific is wrong. But there is a low hum of dread underneath everything, like waiting for the other shoe to drop.',
+        subscale:null, reverse:false },
+      { id:9, en:'How often does your anxiety show up physically — racing heart, tight chest, stomach knots, shallow breathing — even when you know there is nothing specifically wrong right now?',
+        hi:'चिंता शारीरिक रूप से महसूस होती है — दिल तेज़, सीने में जकड़न — बिना किसी खास वजह के?',
+        example:'You are home, safe, nothing happening. But your body is behaving like you are about to face something stressful.',
+        subscale:null, reverse:false },
+      { id:'fc_1', en:'Which describes your anxiety more accurately?',
+        hi:'आपकी चिंता कैसी है?',
+        example:null, subscale:null, reverse:false, isForcedChoice:true,
+        optionA_en:'My anxiety attaches to specific concerns — one worry until it resolves, then the next one.',
+        optionA_hi:'चिंता किसी खास चीज़ से जुड़ी होती है।',
+        optionB_en:'My anxiety is a persistent background state that exists independently and finds things to attach to.',
+        optionB_hi:'चिंता हमेशा रहती है और चीज़ें ढूंढती है।' },    ],
     scoring: {
       type: 'sum',
       scaleStart: 0,
@@ -2284,6 +2600,7 @@ const TESTS = [
   // ——————————————————————————————————————————
   {
     id: 'spin',
+    validityIntro: { en: 'Social anxiety is not introversion or shyness. This measures fear and avoidance that stops you from doing things you want or need to do — not preference for smaller groups or quieter settings.', hi: 'यह एक स्क्रीनिंग परीक्षण है। अपने वास्तविक अनुभव के आधार पर उत्तर दें — वैसा नहीं जैसा आप दिखना चाहते हैं।' },
     name: { en: 'SPIN', hi: 'SPIN' },
     fullName: { en: 'Social Phobia Inventory', hi: 'सामाजिक फोबिया इन्वेंटरी' },
     category: 'anxiety',
@@ -2316,8 +2633,20 @@ const TESTS = [
       { id:14, en:'I am afraid of doing things when people might be watching.',                         hi:'जब लोग देख रहे हों तो काम करने में डर लगता है।',                          example:'Writing, eating, or parking a car feels much harder when you\'re aware someone might be observing you.',               subscale:'Fear',          reverse:false },
       { id:15, en:'Being embarrassed or looking stupid are among my worst fears.',                      hi:'शर्मिंदा होना या मूर्ख दिखना मेरे सबसे बड़े डरों में से है।',             example:'The fear of embarrassing yourself in public looms larger than many other fears.',                                       subscale:'Fear',          reverse:false },
       { id:16, en:'I avoid speaking to anyone in authority.',                                           hi:'मैं अधिकार वाले लोगों से बात करने से बचता/बचती हूं।',                    example:'You don\'t raise concerns with a manager or hold back from asking professionals questions.',                            subscale:'Avoidance',     reverse:false },
-      { id:17, en:'Trembling or shaking in front of others is distressing to me.',                      hi:'लोगों के सामने कांपना या थरथराना मुझे तकलीफ देता है।',                   example:'You notice your hands, voice, or body shaking in social situations and feel distressed by this.',                       subscale:'Fear/Phys',     reverse:false }
-    ],
+      { id:17, en:'Trembling or shaking in front of others is distressing to me.',                      hi:'लोगों के सामने कांपना या थरथराना मुझे तकलीफ देता है।',                   example:'You notice your hands, voice, or body shaking in social situations and feel distressed by this.',                       subscale:'Fear/Phys',     reverse:false },
+
+      { id:'attn_1', en:'I have personally had a private audience with a reigning monarch in their royal palace this week.',
+        hi:'इस हफ्ते मैंने किसी राजशाही के राजमहल में निजी मुलाकात की।',
+        example:'Implausible. Honest respondents select Not at all.',
+        subscale:null, reverse:false, validityExpected:0, isAttentionCheck:true },
+      { id:18, en:'How much distress do you feel at the thought of needing to ask a stranger something ordinary — directions, a question in class, help in a store — because of how the interaction might go wrong?',
+        hi:'किसी अजनबी से कुछ पूछने की सोच से कितनी घबराहट होती है?',
+        example:'You need to ask where the bathroom is. You spend several minutes building up to it, mentally rehearsing, wondering if it is really necessary.',
+        subscale:null, reverse:false },
+      { id:19, en:'How distressing is it when you realize someone was watching you do something ordinary — eating, walking, working — even though they were clearly not judging you?',
+        hi:'जब पता चले कि कोई आपको साधारण काम करते देख रहा था तो कितनी घबराहट होती है?',
+        example:'Someone across the room was watching you eat. They look away. You feel self-consciousness that does not fade quickly.',
+        subscale:null, reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 0,
@@ -2374,8 +2703,19 @@ const TESTS = [
       { id:13, en:'I notice that I have been worrying about things.',                                    hi:'मुझे पता चलता है कि मैं चीज़ों की चिंता करता/करती रहा/रही हूं।',                  example:'You catch yourself mid-worry and realise you\'ve been mentally spinning on the same concern for a long time.',  subscale:null, reverse:false },
       { id:14, en:'Once I start worrying, I cannot stop.',                                               hi:'एक बार चिंता शुरू हो जाए, तो मैं रोक नहीं पाता/पाती।',                           example:'Worry escalates, branches into new concerns, and is very hard to deliberately bring to an end.',               subscale:null, reverse:false },
       { id:15, en:'I worry all the time.',                                                               hi:'मैं हर वक्त चिंता में रहता/रहती हूं।',                                            example:'There is almost no time of day when worry isn\'t present in the background or foreground of your mind.',        subscale:null, reverse:false },
-      { id:16, en:'I worry about projects until they are all done.',                                     hi:'जब तक काम पूरा न हो, मैं उसकी चिंता करता/करती रहता/रहती हूं।',                  example:'Any ongoing task occupies your mind with worry until it is completely resolved.',                               subscale:null, reverse:false }
-    ],
+      { id:16, en:'I worry about projects until they are all done.',                                     hi:'जब तक काम पूरा न हो, मैं उसकी चिंता करता/करती रहता/रहती हूं।',                  example:'Any ongoing task occupies your mind with worry until it is completely resolved.',                               subscale:null, reverse:false },
+
+      { id:'attn_1', en:'Please select \'Somewhat typical of me\' for this item.',
+        hi:'इस प्रश्न के लिए \'मेरे लिए कुछ हद तक सामान्य\' चुनें।',
+        example:'Direct instruction check.', subscale:null, reverse:false, validityExpected:3, isAttentionCheck:true },
+      { id:17, en:'A new worry tends to appear before the previous one is fully resolved — as if my mind needs something to worry about at all times.',
+        hi:'एक चिंता हल होने से पहले दूसरी शुरू हो जाती है।',
+        example:'Work deadline worry fades. Health worry steps in immediately. There is no gap between worries.',
+        subscale:null, reverse:false },
+      { id:18, en:'When something I was worried about is resolved, I return to calm very briefly — and almost immediately find something new to worry about.',
+        hi:'चिंता दूर होने के बाद राहत बहुत कम समय के लिए होती है।',
+        example:'The test came back fine. Within hours you are already worrying about something else. Relief has a short half-life.',
+        subscale:null, reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 1,
@@ -2396,6 +2736,7 @@ const TESTS = [
   // ——————————————————————————————————————————
   {
     id: 'ocir',
+    validityIntro: { en: 'OCD is not liking things clean or being detail-oriented. This measures unwanted, distressing thoughts and rituals that take significant time and cause real interference. If your habits feel comfortable or chosen, OCD is probably not the right explanation.', hi: 'यह एक स्क्रीनिंग परीक्षण है। अपने वास्तविक अनुभव के आधार पर उत्तर दें — वैसा नहीं जैसा आप दिखना चाहते हैं।' },
     name: { en: 'OCI-R', hi: 'OCI-R' },
     fullName: { en: 'Obsessive-Compulsive Inventory — Revised', hi: 'जुनूनी-बाध्यकारी इन्वेंटरी — संशोधित' },
     category: 'ocd',
@@ -2428,7 +2769,20 @@ const TESTS = [
       { id:15, en:'I need things to be arranged in a particular order.',                                                              hi:'मुझे चीज़ें एक खास तरीके से रखनी होती हैं।',                                          example:'Items on your desk must be in a specific arrangement — anything else causes significant discomfort.',                        subscale:'Ordering',     reverse:false },
       { id:16, en:'I feel that there are good and bad numbers.',                                                                      hi:'मुझे लगता है कि कुछ अंक अच्छे और कुछ बुरे होते हैं।',                                example:'Certain numbers feel lucky or correct while others feel ominous — affecting how many times you do things.',                  subscale:'Neutralising', reverse:false },
       { id:17, en:'I wash my hands more often and longer than necessary.',                                                            hi:'मैं ज़रूरत से ज़्यादा बार और देर तक हाथ धोता/धोती हूं।',                             example:'You wash your hands multiple times in a row and feel strong anxiety if you can\'t wash after touching something dirty.',      subscale:'Washing',      reverse:false },
-      { id:18, en:'I frequently get nasty thoughts and have difficulty getting rid of them.',                                         hi:'मुझे अक्सर घिनौने विचार आते हैं और उन्हें दूर करना मुश्किल होता है।',                 example:'Disturbing thoughts keep returning despite your efforts — trying to push them away often makes them come back stronger.',    subscale:'Obsessing',    reverse:false }
+      { id:18, en:'I frequently get nasty thoughts and have difficulty getting rid of them.',                                         hi:'मुझे अक्सर घिनौने विचार आते हैं और उन्हें दूर करना मुश्किल होता है।',                 example:'Disturbing thoughts keep returning despite your efforts — trying to push them away often makes them come back stronger.',    subscale:'Obsessing',    reverse:false },
+
+      { id:'attn_1', en:'I have personally captained a nuclear submarine on an active patrol mission.',
+        hi:'मैंने सक्रिय मिशन पर एक परमाणु पनडुब्बी का नेतृत्व किया है।',
+        example:'Implausible. Honest respondents select Not at all.',
+        subscale:null, reverse:false, validityExpected:0, isAttentionCheck:true },
+      { id:19, en:'How much distress do you experience when you have completed a task — locked a door, sent an email, finished something important — but cannot shake the feeling it was not done correctly, even after checking?',
+        hi:'काम पूरा करने के बाद भी लगता है सही नहीं हुआ — चाहे कितनी बार जाँचें?',
+        example:'You lock the front door. Check it. Leave. Already wondering if you actually locked it. You might go back.',
+        subscale:'Checking', reverse:false },
+      { id:20, en:'How often do thoughts appear in your mind that feel disgusting, violent, or deeply contrary to your values — thoughts you would never act on, but which keep appearing anyway?',
+        hi:'घृणित, हिंसक या अपने मूल्यों के विरुद्ध विचार आते हैं जो आप कभी नहीं करेंगे पर रोक नहीं सकते?',
+        example:'A violent thought toward someone you love. An intrusive image. You are horrified. It returns anyway.',
+        subscale:'Obsessing', reverse:false },
     ],
     scoring: {
       type: 'sum',
@@ -2489,8 +2843,14 @@ const TESTS = [
       { id:14, en:'If you checked YES to more than one of the above, have several of these ever happened during the same period of time?', hi:'अगर आपने ऊपर एक से ज़्यादा में हां किया है, तो क्या इनमें से कई चीज़ें एक ही समय में हुई हैं?', example:'The symptoms described above all occurred together during the same elevated episode — not spread across different times.', subscale:'cooccurrence', reverse:false },
       { id:15, en:'How much of a problem did any of these cause you — like being unable to work; having family, money or legal troubles; getting into arguments or fights?', hi:'इनसे आपको कितनी समस्या हुई — जैसे काम न कर पाना, परिवार, पैसे या कानूनी परेशानी, या लड़ाई-झगड़ा?', example:'The elevated period caused real-world consequences — not just felt different, but actually caused problems.',      subscale:'impairment',   reverse:false,
         customOptions: { en: ['No problems','Minor problem','Moderate problem','Serious problem'], hi: ['कोई समस्या नहीं','मामूली समस्या','मध्यम समस्या','गंभीर समस्या'], values:[0,0,1,1] }
-      }
-    ],
+      },
+
+      { en:'I have had periods where I needed significantly less sleep than usual and felt more energetic the next day rather than tired.',
+        hi:'कुछ दिनों में सामान्य से कम नींद की ज़रूरत थी और अगले दिन थकान नहीं बल्कि ऊर्जा थी।',
+        example:'Not just a bad night — you genuinely felt you needed less sleep, and felt unusually good on it.' },
+      { en:'I have had periods where I was so confident I started projects, made plans, or took actions that turned out to be much larger or riskier than I realized at the time.',
+        hi:'इतना आत्मविश्वास था कि बड़े फैसले किए जो बाद में ज़रूरत से बड़े या जोखिमभरे निकले।',
+        example:'You signed up for multiple major things, made a financial decision, or started something ambitious — driven by a state, not clear judgment.' },    ],
     scoring: {
       type: 'mdq_special',
       // Positive screen requires ALL THREE:
@@ -2579,8 +2939,19 @@ const TESTS = [
           hi: ['मैं सामान्य से ज़्यादा सक्रिय नहीं हूं।','कभी-कभी सामान्य से ज़्यादा सक्रिय रहता/रहती हूं।','अक्सर सामान्य से ज़्यादा सक्रिय रहता/रहती हूं।','अक्सरहां सामान्य से ज़्यादा सक्रिय रहता/रहती हूं।','हर वक्त सक्रिय या भागदौड़ में रहता/रहती हूं।'],
           values: [0,1,2,3,4]
         }
-      }
-    ],
+      },
+
+      { id:'attn_1', en:'Please select \'0\' (Not at all) for this item.',
+        hi:'इस प्रश्न के लिए \'0\' चुनें।',
+        example:'Direct instruction check.', subscale:null, reverse:false, validityExpected:0, isAttentionCheck:true },
+      { id:6, en:'In the past week, have your thoughts been moving so fast that you could not hold onto any single one — like a radio switching stations too quickly to follow?',
+        hi:'पिछले हफ्ते विचार इतनी तेज़ी से आए कि किसी एक पर टिकना मुश्किल था?',
+        example:'Not just being mentally busy — thoughts are actually racing, jumping, hard to catch or complete before the next one arrives.',
+        subscale:null, reverse:false },
+      { id:7, en:'In the past week, have you felt compelled to start significantly more things — conversations, plans, messages, projects — than usual, because you had noticeably more energy?',
+        hi:'पिछले हफ्ते सामान्य से ज़्यादा काम, बातें या योजनाएं शुरू करने की इच्छा हुई?',
+        example:'You texted many people, started several new projects, reorganized at odd hours — driven by energy that felt unusual.',
+        subscale:null, reverse:false },    ],
     scoring: {
       type: 'asrm_sum',
       cutoffs: [
@@ -2631,8 +3002,16 @@ const TESTS = [
       { id:17, en:'Being "super-alert" or watchful or on guard even when there is no need to be?',                                hi:'बिना ज़रूरत के भी हर वक्त सतर्क, चौकस या सावधान रहना?',                                example:'Sitting with your back to the wall, scanning exits — a state of constant low-level threat detection.',            subscale:'E', reverse:false },
       { id:18, en:'Feeling jumpy or easily startled?',                                                                           hi:'चौंक जाना या आसानी से डर जाना?',                                                      example:'An ordinary sound — a door slamming — causes a disproportionately intense startle response.',                   subscale:'E', reverse:false },
       { id:19, en:'Having difficulty concentrating?',                                                                            hi:'ध्यान लगाने में दिक्कत?',                                                             example:'Reading or following a conversation is harder — your mind drifts back to the event or feels foggy.',             subscale:'E', reverse:false },
-      { id:20, en:'Trouble falling or staying asleep?',                                                                         hi:'नींद आने या सोते रहने में दिक्कत?',                                                    example:'Lying awake unable to sleep, waking multiple times, or waking in a panic — sleep has been disturbed since the event.', subscale:'E', reverse:false }
-    ],
+      { id:20, en:'Trouble falling or staying asleep?',                                                                         hi:'नींद आने या सोते रहने में दिक्कत?',                                                    example:'Lying awake unable to sleep, waking multiple times, or waking in a panic — sleep has been disturbed since the event.', subscale:'E', reverse:false },
+
+      { id:21, en:'In the past month, how often have you found yourself mentally scanning your environment — a room, street, or crowd — for potential threats, even when you know there is probably no danger?',
+        hi:'पिछले महीने कितनी बार माहौल में खतरे ढूंढते रहे — भले ही जानते थे कि कोई खतरा नहीं है?',
+        example:'You sit in a restaurant tracking the door. Walking somewhere, you note exits automatically. It happens without deciding to.',
+        subscale:'E', reverse:false },
+      { id:22, en:'In the past month, how often have you felt disconnected from your own life — watching yourself from outside, or feeling like the world around you is not quite real?',
+        hi:'पिछले महीने खुद से कटा हुआ महसूस किया — जैसे बाहर से देख रहे हों या दुनिया असली नहीं लग रही?',
+        example:'You are in a conversation but feel like you are watching it happen to you. Your body feels distant. The room looks flat.',
+        subscale:'D', reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 0,
@@ -2681,8 +3060,14 @@ const TESTS = [
       { id:4, en:'How satisfied / dissatisfied are you with your current sleep pattern?', hi:'आप अपनी नींद से कितने संतुष्ट या असंतुष्ट हैं?', example:'Overall, when you reflect on how you\'ve been sleeping — falling asleep, staying asleep, waking time — how do you feel?', subscale:null, scaleId:'ISI_SAT'    },
       { id:5, en:'To what extent do you consider your sleep problem to interfere with your daily functioning (e.g., daytime fatigue, ability to function at work, concentration, memory, mood)?', hi:'आपकी नींद की समस्या रोज़ के कामकाज पर कितना असर डालती है?', example:'You feel foggy at work, irritable with people, or unable to concentrate because of poor sleep.', subscale:null, scaleId:'ISI_IMPACT' },
       { id:6, en:'How noticeable to others do you think your sleeping problem is in terms of impairing the quality of your life?', hi:'आपकी नींद की समस्या आपकी जीवन गुणवत्ता पर कितना असर डालती है — दूसरों को दिखने वाला?', example:'Others have commented that you seem tired or off — or you feel your social or professional life has visibly suffered.', subscale:null, scaleId:'ISI_IMPACT' },
-      { id:7, en:'How worried / distressed are you about your current sleep problem?',                               hi:'आप अपनी नींद की समस्या के बारे में कितने चिंतित या परेशान हैं?',               example:'You actively worry about not sleeping — you dread bedtime, or anxiety about sleep is itself making it harder to sleep.',  subscale:null, scaleId:'ISI_IMPACT' }
-    ],
+      { id:7, en:'How worried / distressed are you about your current sleep problem?',                               hi:'आप अपनी नींद की समस्या के बारे में कितने चिंतित या परेशान हैं?',               example:'You actively worry about not sleeping — you dread bedtime, or anxiety about sleep is itself making it harder to sleep.',  subscale:null, scaleId:'ISI_IMPACT' },
+
+      { id:8, en:'Even on nights when you get enough hours of sleep, how often do you wake up feeling like the sleep did not restore you — as though you never truly rested?',
+        hi:'पर्याप्त नींद के बाद भी कितनी बार लगता है कि आराम नहीं मिला?',
+        example:'7-8 hours of sleep. You wake up and feel like you could go straight back. Not refreshed at all.',
+        options:{ en:['None','Mild','Moderate','Severe','Very Severe'],
+                  hi:['कोई नहीं','हल्का','मध्यम','गंभीर','बहुत गंभीर'],
+                  scores:[0,1,2,3,4] }, subscale:null, scaleId:'ISI_SEV' },    ],
     scoring: {
       type: 'sum',
       scaleStart: 0,
@@ -2743,8 +3128,19 @@ const TESTS = [
       { id:22, en:'I have trouble getting back on track if I\'m interrupted.',             hi:'रुकावट आने पर मुझे काम पर वापस आना मुश्किल लगता है।',  example:'Someone calls your name or a notification appears — returning to what you were doing takes significant effort.',    subscale:'Plan', reverse:false },
       { id:23, en:'I have trouble making a plan.',                                         hi:'मुझे योजना बनाने में परेशानी होती है।',                  example:'When faced with a multi-step task, breaking it into an actual plan with steps and timelines feels very hard.',       subscale:'Plan', reverse:false },
       { id:24, en:'I miss the big picture.',                                               hi:'मैं बड़ी तस्वीर को नज़रअंदाज़ कर देता/देती हूं।',        example:'You get absorbed in details and lose sight of the overall goal.',                                                   subscale:'Plan', reverse:false },
-      { id:25, en:'I live for the moment.',                                                hi:'मैं पल में जीता/जीती हूं।',                              example:'Future consequences feel abstract compared to what feels good right now — long-term thinking doesn\'t guide your decisions.', subscale:'Behavioral', reverse:false }
-    ],
+      { id:25, en:'I live for the moment.',                                                hi:'मैं पल में जीता/जीती हूं।',                              example:'Future consequences feel abstract compared to what feels good right now — long-term thinking doesn\'t guide your decisions.', subscale:'Behavioral', reverse:false },
+
+      { id:'attn_1', en:'Please select \'Sometimes\' for this question.',
+        hi:'इस प्रश्न के लिए \'कभी-कभी\' चुनें।',
+        example:'Direct instruction check.', subscale:null, reverse:false, validityExpected:1, isAttentionCheck:true },
+      { id:21, en:'How often do you know exactly what you need to do, feel it genuinely matters, and still cannot make yourself begin — sitting with the task open in front of you, unable to start?',
+        hi:'कितनी बार आप जानते हैं क्या करना है, यह ज़रूरी भी है, फिर भी शुरू नहीं कर पाते?',
+        example:'The document is open. The deadline is real. You care. You are sitting there. And you just cannot initiate.',
+        subscale:'Initiation', reverse:false },
+      { id:22, en:'When a task involves more than 3 or 4 steps, how often do you lose track of what you were originally trying to accomplish before you finish?',
+        hi:'4 से ज़्यादा कदमों वाले काम में रास्ते में भूल जाते हैं कि मूल मकसद क्या था?',
+        example:'You went to fix one thing. Halfway through, 3 other things are open and you cannot remember what you started with.',
+        subscale:'Working Memory', reverse:false },    ],
     scoring: {
       type: 'esqr_sum_and_subscales',
       scaleStart: 0,
@@ -2817,8 +3213,16 @@ const TESTS = [
       { id:'A', en:'Have you gone on eating binges where you feel you may not be able to stop?', hi:'क्या आपके खाने के दौरे पड़े हैं जिनमें आपको लगा कि रुक नहीं पाएंगे?' },
       { id:'B', en:'Have you ever made yourself sick (vomited) to control your weight or shape?', hi:'क्या आपने कभी वज़न या शेप कंट्रोल करने के लिए जान-बूझकर उल्टी की है?' },
       { id:'C', en:'Have you ever used laxatives, diet pills, or diuretics (water pills) to control your weight?', hi:'क्या आपने कभी वज़न कंट्रोल के लिए जुलाब, डाइट पिल्स या पानी की गोलियां ली हैं?' },
-      { id:'D', en:'Have you ever been treated for an eating disorder?', hi:'क्या आपको कभी खाने की बीमारी के लिए इलाज मिला है?' }
-    ],
+      { id:'D', en:'Have you ever been treated for an eating disorder?', hi:'क्या आपको कभी खाने की बीमारी के लिए इलाज मिला है?' },
+
+      { id:27, en:'After eating something you had decided you should not eat, how often do you feel strong anxiety, guilt, or a need to compensate somehow?',
+        hi:'जो नहीं खाना था वो खाने के बाद तेज़ चिंता, अपराधबोध या भरपाई की ज़रूरत होती है?',
+        example:'You ate something. Within minutes: the guilt is disproportionate, thoughts won\'t stop, calculating how to undo it.',
+        isBehavioral:false },
+      { id:28, en:'How often do you estimate or track the caloric or nutritional content of food before deciding whether to eat it?',
+        hi:'खाने से पहले कितनी बार उसकी कैलोरी या पोषण मूल्य का हिसाब लगाते हैं?',
+        example:'In a restaurant, at someone\'s home — the calculation is running in the background before you decide what or how much.',
+        isBehavioral:false },    ],
     scoring: {
       type: 'eat26_sum',
       // Items 1-25: Always=3, Usually=2, Often=1, Sometimes/Rarely/Never=0
@@ -2867,8 +3271,19 @@ const TESTS = [
       { id:7,  en:'In the last month, how often have you been able to control irritations in your life?',                       hi:'पिछले महीने, आप कितनी बार अपनी परेशानियों पर काबू रख पाए?',                        example:'When small annoyances arose, you were able to manage your reaction and move forward.',                             subscale:null, reverse:true  },
       { id:8,  en:'In the last month, how often have you felt that you were on top of things?',                                  hi:'पिछले महीने, आपको कितनी बार लगा कि आप सब कुछ संभाल रहे हैं?',                    example:'A sense of being in control, keeping up with your responsibilities, and managing your life effectively.',          subscale:null, reverse:true  },
       { id:9,  en:'In the last month, how often have you been angered because of things that happened that were outside of your control?', hi:'पिछले महीने, आप कितनी बार उन चीज़ों की वजह से गुस्सा हुए जो आपके बस में नहीं थीं?', example:'Traffic, other people\'s behaviour, or external circumstances made you angry because you couldn\'t change them.', subscale:null, reverse:false },
-      { id:10, en:'In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?', hi:'पिछले महीने, आपको कितनी बार लगा कि मुश्किलें इतनी ज़्यादा हो गई हैं कि उन पर काबू नहीं पाया जा सकता?', example:'A sense that problems had stacked up beyond what any reasonable effort could fix.', subscale:null, reverse:false }
-    ],
+      { id:10, en:'In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?', hi:'पिछले महीने, आपको कितनी बार लगा कि मुश्किलें इतनी ज़्यादा हो गई हैं कि उन पर काबू नहीं पाया जा सकता?', example:'A sense that problems had stacked up beyond what any reasonable effort could fix.', subscale:null, reverse:false },
+
+      { id:'attn_1', en:'Please select \'Sometimes\' for this question.',
+        hi:'इस प्रश्न के लिए \'कभी-कभी\' चुनें।',
+        example:'Direct instruction check.', subscale:null, reverse:false, validityExpected:2, isAttentionCheck:true },
+      { id:11, en:'In the last month, how often has stress affected you physically — disrupting sleep, digestion, appetite, or causing persistent tension in your body?',
+        hi:'पिछले महीने तनाव ने शारीरिक रूप से कितना प्रभावित किया — नींद, पाचन, भूख या शरीर में तनाव?',
+        example:'Stress headaches, stomach knots, getting sick more easily, lying awake at 3am — the body is carrying it.',
+        subscale:null, reverse:false },
+      { id:12, en:'In the last month, how often have you had difficulty recovering from stressful events — still carrying Tuesday\'s problem on Thursday, unable to let it go?',
+        hi:'पिछले महीने तनावपूर्ण घटनाओं से उबरने में मुश्किल हुई — दो दिन बाद भी वही परेशान करता रहा?',
+        example:'The difficult conversation happened Monday. It is Wednesday and you are still replaying it, still tense.',
+        subscale:null, reverse:false },    ],
     scoring: {
       type: 'sum',
       scaleStart: 0,
@@ -2918,6 +3333,13 @@ if (typeof module !== 'undefined' && module.exports) {
  * @returns {Object} result
  */
 function scoreTest(test, answers, lang = 'en') {
+  // Strip validity/attention/forced-choice items from scoring
+  const _clean = {};
+  for (const [k,v] of Object.entries(answers)) {
+    if (!String(k).startsWith('attn_') && !String(k).startsWith('fc_')) _clean[k] = v;
+  }
+  answers = _clean;
+
   let result;
 
   switch (test.scoring.type) {
@@ -5661,8 +6083,11 @@ function getQuestionOptions(test, question) {
 
 // ---- Compute total steps for a test ----
 function getTotalSteps(test) {
-  if (test.id === 'eat26') return test.questionCount + (test.behavioralQuestions?.length || 4);
-  return test.questionCount;
+  // Use actual questions array length (includes added validity/harder questions)
+  // For EAT-26, also count behavioral section
+  const qCount = test.questions ? test.questions.length : test.questionCount;
+  if (test.id === 'eat26') return qCount + (test.behavioralQuestions?.length || 4);
+  return qCount;
 }
 
 // ---- Initialize active test state ----
@@ -5677,7 +6102,9 @@ function initActiveTest(testId) {
     currentQ: 0,
     totalSteps,
     phase: 'intro',
-    startTime: Date.now()
+    startTime: Date.now(),
+    responseTimes: {},      // questionIndex → ms spent
+    _qStart: null           // timestamp when current question was shown
   };
 }
 
@@ -5842,6 +6269,8 @@ function startTest() {
 // QUESTION SCREEN
 // ============================================================
 function _renderQuestionScreen(el) {
+  // Stamp question start time for response-time tracking
+  if (APP.activeTest) APP.activeTest._qStart = Date.now();
   const { test, currentQ, totalSteps, answers } = APP.activeTest;
   const L = APP.lang;
   const S = TEST_PAGE_STRINGS[L] || TEST_PAGE_STRINGS.en;
@@ -5936,6 +6365,28 @@ function _buildStandardQuestion(test, qIndex, lang, S) {
   const question = test.questions[qIndex];
   if (!question) return '<div class="tq-error">Question not found.</div>';
 
+  // ── Forced-choice question ──────────────────────────────────────────
+  if (question.isForcedChoice) {
+    const sel = APP.activeTest.answers[qIndex];
+    return `
+    <div class="tq-question-card" id="tq-card">
+      <div class="tq-q-num">${L==='hi'?'प्रश्न':'Q'} ${qIndex + 1}</div>
+      <div class="tq-q-text" lang="${L}">${question[L] || question.en}</div>
+      <div class="fc-options" role="group" aria-label="${L==='hi'?'उत्तर विकल्प':'Answer options'}">
+        <button class="fc-option ${sel===0?'selected':''}" type="button"
+                onclick="tqSelectAnswer(${qIndex}, 0)">
+          <span class="fc-option-label" aria-hidden="true">A</span>
+          <span>${L==='hi' ? (question.optionA_hi||question.optionA_en) : question.optionA_en}</span>
+        </button>
+        <button class="fc-option ${sel===1?'selected':''}" type="button"
+                onclick="tqSelectAnswer(${qIndex}, 1)">
+          <span class="fc-option-label" aria-hidden="true">B</span>
+          <span>${L==='hi' ? (question.optionB_hi||question.optionB_en) : question.optionB_en}</span>
+        </button>
+      </div>
+    </div>`;
+  }
+
   const opts = getQuestionOptions(test, question);
   const isAsrm = (test.scoring.type === 'asrm_sum');
   const selectedIdx = APP.activeTest.answers[qIndex];
@@ -6026,7 +6477,13 @@ function _buildBehavioralQuestion(test, qIndex, lang, S) {
 
 function tqSelectAnswer(questionIndex, answerIndex) {
   if (!APP.activeTest) return;
-
+  // Record time spent on this question
+  if (APP.activeTest._qStart) {
+    const elapsed = Date.now() - APP.activeTest._qStart;
+    if (elapsed > 0 && elapsed < 120000) {
+      APP.activeTest.responseTimes[questionIndex] = elapsed;
+    }
+  }
   APP.activeTest.answers[questionIndex] = answerIndex;
 
   // Update UI: deselect all, select clicked
@@ -6143,6 +6600,41 @@ function tqSubmit() {
   }
 
   APP.crisisShownForResult = false;
+
+  // ── Validity check ───────────────────────────────────────
+  const { test: _t, responseTimes: _rt } = APP.activeTest;
+  const _validityItems = (_t.questions || []).filter(q => String(q.id).startsWith('attn_'));
+  const _attnFailed = VALIDITY_ENGINE.checkAttention(safeAnswers.reduce((acc, v, i) => {
+    const q = (_t.questions||[])[i];
+    if (q) acc[q.id] = v;
+    return acc;
+  }, {}), _validityItems.map((q,i) => ({ id: q.id, expected: q.validityExpected ?? 0 })));
+  
+  // Build answer map by question id for validity engine
+  const _answerMap = {};
+  (_t.questions||[]).forEach((q,i) => { _answerMap[q.id] = safeAnswers[i]; });
+  const _validity = VALIDITY_ENGINE.evaluate(_t.id, _answerMap, _rt, _attnFailed);
+
+  // Store to session results for cross-test checking
+  if (!APP.sessionResults) APP.sessionResults = {};
+  APP.sessionResults[_t.id] = { ...formatted, validityLevel: _validity.level };
+
+  // Attach validity data to formatted result so renderResult can use it
+  formatted._validity = _validity;
+  formatted._responseTimes = _rt;
+  formatted._questions = _t.questions || [];
+
+  // Show interstitial for medium/hard flags
+  if (_validity.level === 'medium' || _validity.level === 'hard') {
+    showValidityInterstitial(
+      _validity,
+      () => _navigateToResult(formatted),   // continue
+      () => { APP.activeTest = null; navigate('test', [_t.id]); }, // retake
+      APP.lang
+    );
+    return;
+  }
+
   _navigateToResult(formatted);
 }
 
@@ -6773,8 +7265,26 @@ function renderResult(params) {
     <div class="res-print-disclaimer">${S.disclaimer}</div>
   </div>
 
-  <div class="res-wrap print-target">
+  <div class="res-wrap print-target${result._validity?.level === 'hard' ? ' result-stripped' : ''}">
     <div class="container res-container">
+
+      <!-- VALIDITY BANNER -->
+      ${(()=>{
+        const _vl = result._validity?.level;
+        if (!_vl || _vl==='none') return '';
+        return buildValidityBanner(_vl, L);
+      })()}
+
+      <!-- CROSS-TEST MESSAGES -->
+      ${(()=>{
+        if (!APP.sessionResults) return '';
+        const issues = VALIDITY_ENGINE.checkCross(APP.sessionResults);
+        if (!issues.length) return '';
+        return issues.map(id => {
+          const msg = VALIDITY_ENGINE.crossMsg[L]?.[id] || VALIDITY_ENGINE.crossMsg.en?.[id] || '';
+          return msg ? `<div class="cross-test-msg">${msg}</div>` : '';
+        }).join('');
+      })()}
 
       <!-- TOP HEADER -->
       <div class="res-top-bar">
@@ -7002,6 +7512,15 @@ function renderResult(params) {
         </div>
 
       </div><!-- .res-card -->
+
+      <!-- WHAT THIS IS NOT -->
+      ${buildNotBox(result.testId, L)}
+
+      <!-- TIME INSIGHT -->
+      ${(()=>{
+        const topQs = VALIDITY_ENGINE.getTopQs(result._responseTimes, result._questions);
+        return buildTimeInsight(topQs, L);
+      })()}
 
       <!-- ACTION BUTTONS -->
       <div class="res-actions">
@@ -8460,6 +8979,126 @@ function renderBlog() {
   document.head.appendChild(style);
 })();
 
+
+// ============================================================
+// VALIDITY ENGINE
+// ============================================================
+const VALIDITY_ENGINE = {
+  config: {
+    asrs:    { sdMin:0.5,  speedMin:2000, suppress:false },
+    bis11:   { sdMin:0.6,  speedMin:2000, suppress:false },
+    aq10:    { sdMin:0.4,  speedMin:2000, suppress:false },
+    raads14: { sdMin:0.5,  speedMin:2000, suppress:false },
+    catq:    { sdMin:0.8,  speedMin:2000, suppress:false },
+    tas20:   { sdMin:0.7,  speedMin:2000, suppress:false },
+    phq9:    { sdMin:0.35, speedMin:1000, suppress:false },
+    epds:    { sdMin:0.3,  speedMin:1000, suppress:false },
+    gds15:   { sdMin:0.25, speedMin:3500, suppress:false },
+    gad7:    { sdMin:0.5,  speedMin:2000, suppress:false },
+    spin:    { sdMin:0.6,  speedMin:2000, suppress:false },
+    pswq:    { sdMin:0.7,  speedMin:2000, suppress:false },
+    ocir:    { sdMin:0.5,  speedMin:2000, suppress:false },
+    mdq:     { sdMin:0.3,  speedMin:2000, suppress:false },
+    asrm:    { sdMin:0.4,  speedMin:2000, suppress:false },
+    pcl5:    { sdMin:0,    speedMin:0,    suppress:true  },
+    isi:     { sdMin:0.5,  speedMin:2000, suppress:false },
+    esqr:    { sdMin:0.6,  speedMin:2000, suppress:false },
+    eat26:   { sdMin:0,    speedMin:0,    suppress:true  },
+    pss10:   { sdMin:0.5,  speedMin:2000, suppress:false },
+  },
+
+  crossRules: [
+    { id:'adhd_isolated',     needs:['asrs','gad7','phq9'],  check: r => (r.asrs?.score??-1)>=4 && (r.gad7?.score??99)<3 && (r.phq9?.score??99)<3 },
+    { id:'autism_no_masking', needs:['aq10','catq'],          check: r => (r.aq10?.score??-1)>=6 && (r.catq?.score??99)<60 },
+    { id:'bipolar_mismatch',  needs:['mdq','asrm'],           check: r => r.mdq?.positiveScreen && (r.asrm?.score??99)<4 },
+    { id:'adhd_ef_mismatch',  needs:['asrs','esqr'],          check: r => (r.asrs?.score??-1)>=4 && (r.esqr?.score??99)<20 },
+    { id:'autism_aq_raads',   needs:['aq10','raads14'],       check: r => (r.aq10?.score??-1)>=6 && (r.raads14?.score??99)<14 },
+  ],
+
+  crossMsg: {
+    en: {
+      adhd_isolated:    '⚠️ Cross-test pattern: Your ADHD screen is elevated, but both your anxiety and depression scores are minimal. ADHD and anxiety co-occur in roughly 50% of clinical presentations. This isolated pattern is statistically unusual — worth discussing with a psychiatrist who can evaluate the full picture.',
+      autism_no_masking:'⚠️ Cross-test pattern: Your AQ-10 suggests autistic traits, but your CAT-Q shows minimal camouflaging. Most autistic adults who reach adulthood undiagnosed develop significant masking strategies. This combination is unusual and may reflect something different.',
+      bipolar_mismatch: '⚠️ Cross-test pattern: Your MDQ lifetime screen is positive, but your current mood elevation score is low. Bipolar disorder is episodic — MDQ captures whether you have ever had these experiences, ASRM captures right now. This can be clinically consistent.',
+      adhd_ef_mismatch: '⚠️ Cross-test pattern: Your ADHD score is elevated but your executive function difficulties are low. ADHD almost always involves EF challenges. This may reflect strong compensatory strategies — or suggest a different primary explanation.',
+      autism_aq_raads:  '⚠️ Cross-test pattern: AQ-10 is elevated but RAADS-14 is below clinical threshold. The two autism screens sometimes diverge. Neither is definitive — a clinical assessment would clarify.',
+    },
+    hi: {
+      adhd_isolated:    '⚠️ क्रॉस-टेस्ट पैटर्न: ADHD स्कोर अधिक है लेकिन चिंता और अवसाद दोनों कम हैं — यह असामान्य है।',
+      autism_no_masking:'⚠️ क्रॉस-टेस्ट पैटर्न: AQ-10 पर लक्षण हैं लेकिन CAT-Q पर masking कम है — असामान्य संयोजन।',
+      bipolar_mismatch: '⚠️ क्रॉस-टेस्ट पैटर्न: MDQ सकारात्मक लेकिन ASRM कम — द्विध्रुवी episodic होता है।',
+      adhd_ef_mismatch: '⚠️ क्रॉस-टेस्ट पैटर्न: ADHD स्कोर अधिक लेकिन executive function कम नहीं है।',
+      autism_aq_raads:  '⚠️ क्रॉस-टेस्ट पैटर्न: AQ-10 और RAADS-14 में अंतर है — नैदानिक मूल्यांकन स्पष्ट करेगा।',
+    }
+  },
+
+  evaluate(testId, answers, responseTimes, attentionFailed) {
+    const cfg = this.config[testId];
+    if (!cfg || cfg.suppress) return { level:'none', concerns:[] };
+
+    const concerns = [];
+
+    // 1. Uniformity check (std dev of scoreable answers)
+    const vals = Object.entries(answers)
+      .filter(([k]) => !String(k).startsWith('attn_') && !String(k).startsWith('fc_'))
+      .map(([,v]) => Number(v)).filter(Number.isFinite);
+    if (vals.length >= 4) {
+      const mu = vals.reduce((a,b)=>a+b,0)/vals.length;
+      const sd = Math.sqrt(vals.reduce((a,b)=>a+Math.pow(b-mu,2),0)/vals.length);
+      if (sd < cfg.sdMin) concerns.push({ type:'uniformity', detail:`SD ${sd.toFixed(2)} < ${cfg.sdMin}` });
+    }
+
+    // 2. Speed check
+    if (responseTimes) {
+      const ts = Object.values(responseTimes)
+        .filter(Number.isFinite).filter(t=>t>200&&t<120000);
+      if (ts.length >= 4) {
+        const avg = ts.reduce((a,b)=>a+b,0)/ts.length;
+        if (avg < cfg.speedMin) concerns.push({ type:'speed', detail:`avg ${Math.round(avg)}ms` });
+      }
+    }
+
+    // 3. Attention check failures
+    if (attentionFailed > 0) concerns.push({ type:'attention', count:attentionFailed });
+
+    const level = concerns.length===0?'none'
+      :concerns.length===1?'soft'
+      :concerns.length===2?'medium'
+      :'hard';
+    return { level, concerns };
+  },
+
+  checkAttention(answers, validityItems) {
+    if (!validityItems?.length) return 0;
+    return validityItems.filter(vi => {
+      const ans = answers[vi.id];
+      return ans !== undefined && Number(ans) !== vi.expected;
+    }).length;
+  },
+
+  getTopQs(responseTimes, questions) {
+    if (!responseTimes || !questions?.length) return [];
+    const coreEntries = Object.entries(responseTimes)
+      .filter(([k]) => !String(k).startsWith('attn_') && !String(k).startsWith('fc_'))
+      .filter(([,v]) => v > 500);
+    if (coreEntries.length < 2) return [];
+    return coreEntries
+      .sort(([,a],[,b]) => b-a).slice(0,2)
+      .map(([id]) => questions.find(q => String(q.id)===String(id)))
+      .filter(Boolean);
+  },
+
+  checkCross(sessionResults) {
+    return this.crossRules
+      .filter(r => r.needs.every(n => sessionResults[n]))
+      .filter(r => { try { return r.check(sessionResults); } catch(e){ return false; } })
+      .map(r => r.id);
+  }
+};
+
+// Session result store for cross-test checking (no login needed)
+if (typeof APP !== 'undefined' && !APP.sessionResults) APP.sessionResults = {};
+// ============================================================
 </script>
 </body>
 </html>
